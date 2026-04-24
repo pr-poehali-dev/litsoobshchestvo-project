@@ -806,7 +806,13 @@ function MessengerPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
-function ProfilePanel({ onClose }: { onClose: () => void }) {
+function ProfilePanel({ onClose, userName, onLogout, onDashboard }: {
+  onClose: () => void;
+  userName: string;
+  onLogout: () => void;
+  onDashboard: () => void;
+}) {
+  const initials = userName.slice(0, 2).toUpperCase();
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-end pt-16 pr-4" onClick={onClose}>
       <div className="w-72 rounded-xl shadow-xl herb-border anim-up overflow-hidden"
@@ -815,15 +821,15 @@ function ProfilePanel({ onClose }: { onClose: () => void }) {
           <div className="flex items-center gap-3 mb-3">
             <Avatar className="w-12 h-12">
               <AvatarFallback className="font-display text-lg font-semibold"
-                style={{ background: "var(--olive)", color: "var(--cream)" }}>СВ</AvatarFallback>
+                style={{ background: "var(--olive)", color: "var(--cream)" }}>{initials}</AvatarFallback>
             </Avatar>
             <div>
-              <div className="font-display text-base font-semibold" style={{ color: "var(--ink)" }}>Соня Вешняя</div>
+              <div className="font-display text-base font-semibold" style={{ color: "var(--ink)" }}>{userName}</div>
               <span className="genre-badge">Автор</span>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center">
-            {[["11","книг"],["24К","читателей"],["680","подписчиков"]].map(([v,l]) => (
+            {[["0","книг"],["0","читателей"],["0","подписчиков"]].map(([v,l]) => (
               <div key={l} className="p-2 rounded-lg" style={{ background: "var(--cream)" }}>
                 <div className="font-display text-lg font-semibold" style={{ color: "var(--leaf)" }}>{v}</div>
                 <div className="font-body text-xs" style={{ color: "var(--ink-muted)" }}>{l}</div>
@@ -841,20 +847,742 @@ function ProfilePanel({ onClose }: { onClose: () => void }) {
               200 000 знаков · 150 читателей · 50 подписчиков
             </div>
             <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--sage-mid)" }}>
-              <div className="h-full rounded-full" style={{ width: "72%", background: "var(--leaf)" }} />
+              <div className="h-full rounded-full" style={{ width: "0%", background: "var(--leaf)" }} />
             </div>
-            <div className="font-body text-xs mt-1" style={{ color: "var(--ink-muted)" }}>72% — почти у цели!</div>
+            <div className="font-body text-xs mt-1" style={{ color: "var(--ink-muted)" }}>Начните писать!</div>
           </div>
-          {[["Мои рукописи","BookOpen"],["Моя библиотека","Library"],["Блог","PenLine"],["Настройки","Settings"],["Выйти","LogOut"]].map(([l,ic]) => (
-            <button key={l} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-body text-sm transition-all text-left"
+          <button onClick={onDashboard}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-body text-sm transition-all text-left hover:bg-sage"
+            style={{ color: "var(--ink-soft)", background: "transparent" }}>
+            <Icon name="LayoutDashboard" size={15} style={{ color: "var(--leaf)" }} />
+            Личный кабинет
+          </button>
+          {[["Мои рукописи","BookOpen"],["Моя библиотека","Library"],["Блог","PenLine"],["Настройки","Settings"]].map(([l,ic]) => (
+            <button key={l} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-body text-sm transition-all text-left hover:bg-sage"
               style={{ color: "var(--ink-soft)", background: "transparent" }}>
               <Icon name={ic as "BookOpen"} size={15} style={{ color: "var(--leaf)" }} />
               {l}
             </button>
           ))}
+          <button onClick={onLogout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-body text-sm transition-all text-left hover:bg-sage"
+            style={{ color: "#9e3030", background: "transparent" }}>
+            <Icon name="LogOut" size={15} style={{ color: "#9e3030" }} />
+            Выйти
+          </button>
         </div>
       </div>
     </div>
+  );
+}
+
+/* ════════════════════════════════════════
+   МОДАЛ ВХОДА / РЕГИСТРАЦИИ
+════════════════════════════════════════ */
+
+const SOCIAL_PROVIDERS = [
+  { id: "vk", label: "ВКонтакте", color: "#0077FF", bg: "#E8F1FF", emoji: "💙" },
+  { id: "google", label: "Google", color: "#DB4437", bg: "#FFEEED", emoji: "🔴" },
+  { id: "ok", label: "Одноклассники", color: "#EE8208", bg: "#FFF3E0", emoji: "🟠" },
+  { id: "yandex", label: "Яндекс", color: "#FC3F1D", bg: "#FFF0EE", emoji: "🟡" },
+];
+
+function AuthModal({ onClose, onLogin }: { onClose: () => void; onLogin: (name: string) => void }) {
+  const [tab, setTab] = useState<"login" | "register">("login");
+  const [method, setMethod] = useState<"social" | "email" | "phone">("social");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [pass, setPass] = useState("");
+  const [name, setName] = useState("");
+  const [agree, setAgree] = useState(false);
+  const [step, setStep] = useState<"form" | "success">("form");
+
+  const handleSubmit = () => {
+    const displayName = name || email.split("@")[0] || phone || "Пользователь";
+    setStep("success");
+    setTimeout(() => { onLogin(displayName); onClose(); }, 1500);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/25 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl shadow-2xl herb-border overflow-hidden anim-up"
+        style={{ background: "var(--cream)" }} onClick={e => e.stopPropagation()}>
+
+        {step === "success" ? (
+          <div className="p-10 text-center">
+            <div className="text-5xl mb-4">🌿</div>
+            <h3 className="font-display text-2xl font-semibold mb-2" style={{ color: "var(--forest)" }}>Добро пожаловать!</h3>
+            <p className="font-body text-sm" style={{ color: "var(--ink-muted)" }}>Переходим в личный кабинет...</p>
+          </div>
+        ) : (
+          <>
+            {/* Шапка */}
+            <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: "var(--moss)", background: "linear-gradient(to right, var(--sage), var(--sage-mid))" }}>
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🌿</span>
+                <span className="font-display text-lg font-semibold" style={{ color: "var(--forest)" }}>Писатель.Плюс</span>
+              </div>
+              <button onClick={onClose}><Icon name="X" size={18} style={{ color: "var(--ink-muted)" }} /></button>
+            </div>
+
+            {/* Табы */}
+            <div className="flex border-b" style={{ borderColor: "var(--moss)" }}>
+              {(["login","register"] as const).map(t => (
+                <button key={t} onClick={() => setTab(t)}
+                  className="flex-1 py-3 font-body text-sm font-medium transition-all"
+                  style={tab===t ? { color: "var(--forest)", borderBottom: "2px solid var(--leaf)", background: "transparent" } : { color: "var(--ink-muted)", borderBottom: "2px solid transparent", background: "transparent" }}>
+                  {t==="login" ? "Войти" : "Зарегистрироваться"}
+                </button>
+              ))}
+            </div>
+
+            <div className="p-6">
+              {/* Способ входа */}
+              <div className="flex gap-2 mb-5">
+                {(["social","email","phone"] as const).map(m => (
+                  <button key={m} onClick={() => setMethod(m)}
+                    className="flex-1 py-1.5 rounded-lg font-body text-xs transition-all"
+                    style={method===m ? { background:"var(--olive)", color:"var(--cream)" } : { color:"var(--ink-soft)", border:"1px solid var(--moss)", background:"transparent" }}>
+                    {m==="social" ? "Соцсети" : m==="email" ? "E-mail" : "Телефон"}
+                  </button>
+                ))}
+              </div>
+
+              {method === "social" && (
+                <div className="grid grid-cols-2 gap-3">
+                  {SOCIAL_PROVIDERS.map(p => (
+                    <button key={p.id} onClick={handleSubmit}
+                      className="flex items-center gap-2.5 px-4 py-3 rounded-xl border font-body text-sm font-medium transition-all hover:scale-[1.02]"
+                      style={{ background: p.bg, borderColor: p.color + "40", color: "#1a1a1a" }}>
+                      <span className="text-lg">{p.emoji}</span>
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {method === "email" && (
+                <div className="space-y-3">
+                  {tab === "register" && (
+                    <div>
+                      <label className="font-body text-xs font-medium mb-1 block" style={{ color: "var(--ink-muted)" }}>Имя / псевдоним</label>
+                      <input value={name} onChange={e => setName(e.target.value)}
+                        placeholder="Как вас называть?"
+                        className="w-full px-3 py-2.5 rounded-lg font-body text-sm outline-none herb-border"
+                        style={{ background: "var(--sage)", color: "var(--ink)" }} />
+                    </div>
+                  )}
+                  <div>
+                    <label className="font-body text-xs font-medium mb-1 block" style={{ color: "var(--ink-muted)" }}>E-mail</label>
+                    <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      className="w-full px-3 py-2.5 rounded-lg font-body text-sm outline-none herb-border"
+                      style={{ background: "var(--sage)", color: "var(--ink)" }} />
+                  </div>
+                  <div>
+                    <label className="font-body text-xs font-medium mb-1 block" style={{ color: "var(--ink-muted)" }}>Пароль</label>
+                    <input type="password" value={pass} onChange={e => setPass(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full px-3 py-2.5 rounded-lg font-body text-sm outline-none herb-border"
+                      style={{ background: "var(--sage)", color: "var(--ink)" }} />
+                  </div>
+                  {tab === "register" && (
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} className="mt-0.5 accent-olive" />
+                      <span className="font-body text-xs" style={{ color: "var(--ink-muted)" }}>
+                        Соглашаюсь с <span className="underline cursor-pointer" style={{ color: "var(--leaf)" }}>Пользовательским соглашением</span> и <span className="underline cursor-pointer" style={{ color: "var(--leaf)" }}>Политикой конфиденциальности</span>
+                      </span>
+                    </label>
+                  )}
+                  <button onClick={handleSubmit} disabled={!email || !pass || (tab==="register" && !agree)}
+                    className="w-full olive-btn py-2.5 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                    {tab==="login" ? "Войти" : "Создать аккаунт"}
+                  </button>
+                </div>
+              )}
+
+              {method === "phone" && (
+                <div className="space-y-3">
+                  {tab === "register" && (
+                    <div>
+                      <label className="font-body text-xs font-medium mb-1 block" style={{ color: "var(--ink-muted)" }}>Имя / псевдоним</label>
+                      <input value={name} onChange={e => setName(e.target.value)}
+                        placeholder="Как вас называть?"
+                        className="w-full px-3 py-2.5 rounded-lg font-body text-sm outline-none herb-border"
+                        style={{ background: "var(--sage)", color: "var(--ink)" }} />
+                    </div>
+                  )}
+                  <div>
+                    <label className="font-body text-xs font-medium mb-1 block" style={{ color: "var(--ink-muted)" }}>Номер телефона</label>
+                    <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
+                      placeholder="+7 (900) 000-00-00"
+                      className="w-full px-3 py-2.5 rounded-lg font-body text-sm outline-none herb-border"
+                      style={{ background: "var(--sage)", color: "var(--ink)" }} />
+                  </div>
+                  {tab === "register" && (
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} className="mt-0.5" />
+                      <span className="font-body text-xs" style={{ color: "var(--ink-muted)" }}>
+                        Соглашаюсь с <span className="underline" style={{ color: "var(--leaf)" }}>Пользовательским соглашением</span>
+                      </span>
+                    </label>
+                  )}
+                  <button onClick={handleSubmit} disabled={!phone || (tab==="register" && !agree)}
+                    className="w-full olive-btn py-2.5 rounded-lg text-sm disabled:opacity-50">
+                    Получить код по SMS
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════
+   МОДАЛ «СОЗДАТЬ»
+════════════════════════════════════════ */
+
+const BOOK_GENRES_ALL = [
+  "Роман","Повесть","Рассказ","Сборник рассказов","Сборник поэзии",
+  "Фэнтези","Фантастика","Мистика","Детектив","Триллер","Ужасы",
+  "Романтика","Любовный роман","Историческая проза","Современная проза",
+  "ЛитРПГ","Боевик","Эротика","Поэзия","Юмор","Фанфик",
+];
+
+const BOOK_FORMS = ["Роман","Повесть","Рассказ","Сборник рассказов","Сборник поэзии"];
+const CONTENT_LABELS = [
+  { id: "18plus", label: "18+", desc: "Содержание только для взрослых", cls: "tag-18" },
+  { id: "drugs", label: "Наркотики/ПАВ", desc: "Упоминание наркотических средств", cls: "tag-drug" },
+  { id: "violence", label: "Насилие", desc: "Сцены насилия", cls: "tag-violence" },
+  { id: "erotica", label: "Эротика", desc: "Эротическое содержание", cls: "tag-ero" },
+  { id: "profanity", label: "Нецензурная лексика", desc: "Ненормативная лексика", cls: "tag-lang" },
+];
+const ACCESS_OPTIONS = ["Только я", "Друзья и подписчики", "Все"];
+
+function CreateModal({ onClose }: { onClose: () => void }) {
+  const [step, setStep] = useState<"choose" | "book" | "blog" | "done">("choose");
+  const [bookPage, setBookPage] = useState(1);
+
+  // Поля книги
+  const [title, setTitle] = useState("");
+  const [coauthor, setCoauthor] = useState("");
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [form, setForm] = useState("");
+  const [annotation, setAnnotation] = useState("");
+  const [tags, setTags] = useState("");
+  const [note, setNote] = useState("");
+  const [labels, setLabels] = useState<string[]>([]);
+  const [coverName, setCoverName] = useState("");
+  const [viewAccess, setViewAccess] = useState("Все");
+  const [downloadAccess, setDownloadAccess] = useState("Друзья и подписчики");
+  const [commentAccess, setCommentAccess] = useState("Все");
+  const [freeFragment, setFreeFragment] = useState(false);
+  const [redLine, setRedLine] = useState(true);
+  const [copyProtect, setCopyProtect] = useState(true);
+
+  const toggleGenre = (g: string) => {
+    if (selectedGenres.includes(g)) setSelectedGenres(selectedGenres.filter(x => x !== g));
+    else if (selectedGenres.length < 3) setSelectedGenres([...selectedGenres, g]);
+  };
+
+  const toggleLabel = (id: string) => {
+    setLabels(l => l.includes(id) ? l.filter(x => x !== id) : [...l, id]);
+  };
+
+  const canNext1 = title.trim().length > 0;
+
+  if (step === "done") return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/25" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-2xl shadow-2xl herb-border p-10 text-center anim-up"
+        style={{ background: "var(--cream)" }} onClick={e => e.stopPropagation()}>
+        <div className="text-5xl mb-4">📜</div>
+        <h3 className="font-display text-2xl font-semibold mb-2" style={{ color: "var(--forest)" }}>
+          {step === "done" && (bookPage > 1 ? `«${title}» создана!` : "Готово!")}
+        </h3>
+        <p className="font-body text-sm mb-5" style={{ color: "var(--ink-muted)" }}>Книга сохранена в черновиках. Добавьте первую главу!</p>
+        <button className="olive-btn px-6 py-2.5 rounded-lg text-sm" onClick={onClose}>Перейти к написанию</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/25 p-4 overflow-y-auto" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl shadow-2xl herb-border overflow-hidden anim-up my-4"
+        style={{ background: "var(--cream)" }} onClick={e => e.stopPropagation()}>
+
+        {/* Шапка */}
+        <div className="flex items-center justify-between p-4 border-b"
+          style={{ borderColor: "var(--moss)", background: "linear-gradient(to right, var(--sage), var(--sage-mid))" }}>
+          <div className="flex items-center gap-2">
+            {step !== "choose" && (
+              <button onClick={() => step==="book" && bookPage>1 ? setBookPage(p=>p-1) : setStep("choose")}
+                className="mr-1 p-1 rounded-lg" style={{ color: "var(--ink-soft)" }}>
+                <Icon name="ArrowLeft" size={16} />
+              </button>
+            )}
+            <h3 className="font-display text-lg font-semibold" style={{ color: "var(--forest)" }}>
+              {step==="choose" ? "Создать" : step==="book" ? `Новая книга — шаг ${bookPage}/2` : "Новый блог"}
+            </h3>
+          </div>
+          <button onClick={onClose}><Icon name="X" size={18} style={{ color: "var(--ink-muted)" }} /></button>
+        </div>
+
+        {/* Выбор типа */}
+        {step === "choose" && (
+          <div className="p-6 grid grid-cols-2 gap-4">
+            {[
+              { id: "book", icon: "📜", title: "Написать книгу", desc: "Роман, повесть, рассказ, поэзия, сборник" },
+              { id: "blog", icon: "✍️", title: "Написать блог", desc: "Личное, статьи, конкурсы, самопиар" },
+            ].map(opt => (
+              <button key={opt.id} onClick={() => setStep(opt.id as "book"|"blog")}
+                className="card-herb p-5 text-left transition-all"
+                style={{ background: "var(--sage)" }}>
+                <div className="text-3xl mb-2">{opt.icon}</div>
+                <div className="font-display text-base font-semibold" style={{ color: "var(--ink)" }}>{opt.title}</div>
+                <div className="font-body text-xs mt-1" style={{ color: "var(--ink-muted)" }}>{opt.desc}</div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Форма книги — шаг 1 */}
+        {step === "book" && bookPage === 1 && (
+          <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+            {/* Название */}
+            <div>
+              <label className="font-body text-xs font-semibold mb-1.5 flex items-center gap-1" style={{ color: "var(--ink-soft)" }}>
+                Название <span style={{ color: "#c04040" }}>*</span>
+              </label>
+              <input value={title} onChange={e => setTitle(e.target.value)}
+                placeholder="Введите название произведения"
+                className="w-full px-3 py-2.5 rounded-lg font-body text-sm outline-none herb-border"
+                style={{ background: "var(--sage)", color: "var(--ink)" }} />
+            </div>
+
+            {/* Соавтор */}
+            <div>
+              <label className="font-body text-xs font-semibold mb-1.5 block" style={{ color: "var(--ink-soft)" }}>
+                Соавтор <span className="font-normal" style={{ color: "var(--ink-muted)" }}>(необязательно)</span>
+              </label>
+              <input value={coauthor} onChange={e => setCoauthor(e.target.value)}
+                placeholder="Поиск по @нику или имени"
+                className="w-full px-3 py-2.5 rounded-lg font-body text-sm outline-none herb-border"
+                style={{ background: "var(--sage)", color: "var(--ink)" }} />
+            </div>
+
+            {/* Жанры */}
+            <div>
+              <label className="font-body text-xs font-semibold mb-1.5 block" style={{ color: "var(--ink-soft)" }}>
+                Жанры <span style={{ color: "var(--ink-muted)" }} className="font-normal">(до 3-х)</span>
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {BOOK_GENRES_ALL.map(g => (
+                  <button key={g} onClick={() => toggleGenre(g)}
+                    className="px-2.5 py-1 rounded-full font-body text-xs transition-all"
+                    style={selectedGenres.includes(g)
+                      ? { background:"var(--olive)", color:"var(--cream)" }
+                      : selectedGenres.length>=3
+                        ? { color:"var(--ink-muted)", border:"1px solid var(--moss)", background:"transparent", opacity:0.5, cursor:"not-allowed" }
+                        : { color:"var(--ink-soft)", border:"1px solid var(--moss)", background:"transparent" }}>
+                    {g}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Форма произведения */}
+            <div>
+              <label className="font-body text-xs font-semibold mb-1.5 block" style={{ color: "var(--ink-soft)" }}>Форма произведения</label>
+              <div className="flex flex-wrap gap-2">
+                {BOOK_FORMS.map(f => (
+                  <button key={f} onClick={() => setForm(f)}
+                    className="px-3 py-1.5 rounded-lg font-body text-xs transition-all"
+                    style={form===f ? { background:"var(--leaf)", color:"var(--cream)" } : { color:"var(--ink-soft)", border:"1px solid var(--moss)", background:"transparent" }}>
+                    {f}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Аннотация */}
+            <div>
+              <label className="font-body text-xs font-semibold mb-1.5 block" style={{ color: "var(--ink-soft)" }}>Аннотация</label>
+              <textarea value={annotation} onChange={e => setAnnotation(e.target.value)}
+                placeholder="Краткое описание вашей книги..."
+                rows={3}
+                className="w-full px-3 py-2.5 rounded-lg font-body text-sm outline-none herb-border resize-none"
+                style={{ background: "var(--sage)", color: "var(--ink)" }} />
+            </div>
+
+            {/* Теги */}
+            <div>
+              <label className="font-body text-xs font-semibold mb-1.5 block" style={{ color: "var(--ink-soft)" }}>Тэги</label>
+              <input value={tags} onChange={e => setTags(e.target.value)}
+                placeholder="любовь, магия, детектив..."
+                className="w-full px-3 py-2.5 rounded-lg font-body text-sm outline-none herb-border"
+                style={{ background: "var(--sage)", color: "var(--ink)" }} />
+              <p className="font-body text-xs mt-1" style={{ color: "var(--ink-muted)" }}>Через запятую, помогают читателям найти книгу</p>
+            </div>
+
+            {/* Примечание */}
+            <div>
+              <label className="font-body text-xs font-semibold mb-1.5 block" style={{ color: "var(--ink-soft)" }}>Примечание автора</label>
+              <textarea value={note} onChange={e => setNote(e.target.value)}
+                placeholder="Дополнительная информация для читателей..."
+                rows={2}
+                className="w-full px-3 py-2.5 rounded-lg font-body text-sm outline-none herb-border resize-none"
+                style={{ background: "var(--sage)", color: "var(--ink)" }} />
+            </div>
+
+            {/* Метки */}
+            <div>
+              <label className="font-body text-xs font-semibold mb-1.5 block" style={{ color: "var(--ink-soft)" }}>
+                Метки содержания <span style={{ color: "var(--ink-muted)" }} className="font-normal">(отметьте при наличии)</span>
+              </label>
+              <div className="space-y-2">
+                {CONTENT_LABELS.map(l => (
+                  <label key={l.id} className="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg transition-all"
+                    style={{ background: labels.includes(l.id) ? "rgba(88,120,70,0.06)" : "transparent" }}>
+                    <input type="checkbox" checked={labels.includes(l.id)} onChange={() => toggleLabel(l.id)} className="accent-olive" />
+                    <span className={`content-tag ${l.cls}`}>{l.label}</span>
+                    <span className="font-body text-xs" style={{ color: "var(--ink-muted)" }}>{l.desc}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <button onClick={() => setBookPage(2)} disabled={!canNext1}
+              className="w-full olive-btn py-2.5 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+              Далее →
+            </button>
+          </div>
+        )}
+
+        {/* Форма книги — шаг 2 */}
+        {step === "book" && bookPage === 2 && (
+          <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+            {/* Обложка */}
+            <div>
+              <label className="font-body text-xs font-semibold mb-1.5 block" style={{ color: "var(--ink-soft)" }}>Обложка</label>
+              <label className="flex flex-col items-center justify-center gap-2 p-6 rounded-xl cursor-pointer transition-all"
+                style={{ border: "2px dashed var(--moss)", background: coverName ? "rgba(88,120,70,0.07)" : "var(--sage)" }}>
+                {coverName ? (
+                  <>
+                    <Icon name="Image" size={24} style={{ color: "var(--leaf)" }} />
+                    <span className="font-body text-sm" style={{ color: "var(--leaf)" }}>{coverName}</span>
+                    <span className="font-body text-xs" style={{ color: "var(--ink-muted)" }}>Нажмите, чтобы изменить</span>
+                  </>
+                ) : (
+                  <>
+                    <Icon name="Upload" size={24} style={{ color: "var(--ink-muted)" }} />
+                    <span className="font-body text-sm" style={{ color: "var(--ink-soft)" }}>Загрузить обложку</span>
+                    <span className="font-body text-xs" style={{ color: "var(--ink-muted)" }}>JPG, PNG, до 5 МБ</span>
+                  </>
+                )}
+                <input type="file" accept="image/*" className="hidden" onChange={e => setCoverName(e.target.files?.[0]?.name || "")} />
+              </label>
+            </div>
+
+            {/* Настройки доступа */}
+            <div>
+              <label className="font-body text-xs font-semibold mb-2 block" style={{ color: "var(--ink-soft)" }}>Настройки доступа</label>
+              <div className="space-y-3 p-3 rounded-xl" style={{ background: "var(--sage)" }}>
+                {[
+                  { label: "Кто видит произведение", value: viewAccess, set: setViewAccess },
+                  { label: "Кто может скачивать", value: downloadAccess, set: setDownloadAccess },
+                  { label: "Кто может комментировать", value: commentAccess, set: setCommentAccess },
+                ].map(row => (
+                  <div key={row.label}>
+                    <div className="font-body text-xs mb-1.5" style={{ color: "var(--ink-muted)" }}>{row.label}</div>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {ACCESS_OPTIONS.map(opt => (
+                        <button key={opt} onClick={() => row.set(opt)}
+                          className="px-2.5 py-1 rounded-full font-body text-xs transition-all"
+                          style={row.value===opt ? { background:"var(--olive)", color:"var(--cream)" } : { color:"var(--ink-soft)", border:"1px solid var(--moss)", background:"var(--cream)" }}>
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Переключатели */}
+            <div className="space-y-3">
+              {[
+                { label: "Ознакомительный фрагмент", desc: "Отметить часть глав как бесплатный фрагмент", val: freeFragment, set: setFreeFragment },
+                { label: "Красная строка", desc: "Отображать все абзацы с красной строки", val: redLine, set: setRedLine },
+                { label: "Защита от копирования", desc: "Запрет выделения, копирования и скачивания текста", val: copyProtect, set: setCopyProtect },
+              ].map(sw => (
+                <div key={sw.label} className="flex items-start justify-between gap-3 p-3 rounded-xl"
+                  style={{ background: "var(--sage)" }}>
+                  <div className="flex-1">
+                    <div className="font-body text-sm font-medium" style={{ color: "var(--ink)" }}>{sw.label}</div>
+                    <div className="font-body text-xs mt-0.5" style={{ color: "var(--ink-muted)" }}>{sw.desc}</div>
+                  </div>
+                  <button onClick={() => sw.set(!sw.val)}
+                    className="flex-shrink-0 w-10 h-6 rounded-full transition-all relative"
+                    style={{ background: sw.val ? "var(--leaf)" : "var(--moss)" }}>
+                    <div className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all"
+                      style={{ left: sw.val ? "18px" : "2px" }} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button onClick={() => setStep("done")} disabled={!title}
+              className="w-full olive-btn py-2.5 rounded-lg text-sm disabled:opacity-50">
+              Создать книгу
+            </button>
+          </div>
+        )}
+
+        {/* Форма блога */}
+        {step === "blog" && (
+          <div className="p-5 space-y-4">
+            <div>
+              <label className="font-body text-xs font-semibold mb-1.5 block" style={{ color: "var(--ink-soft)" }}>Заголовок</label>
+              <input placeholder="Тема вашей записи..."
+                className="w-full px-3 py-2.5 rounded-lg font-body text-sm outline-none herb-border"
+                style={{ background: "var(--sage)", color: "var(--ink)" }} />
+            </div>
+            <div>
+              <label className="font-body text-xs font-semibold mb-1.5 block" style={{ color: "var(--ink-soft)" }}>Раздел</label>
+              <div className="flex flex-wrap gap-1.5">
+                {["Личное","Самопиар","Дуэли","Статьи","Конкурсы","Оффтопик","Отзывы и критика"].map(t => (
+                  <button key={t} className="px-2.5 py-1 rounded-full font-body text-xs transition-all"
+                    style={{ color:"var(--ink-soft)", border:"1px solid var(--moss)", background:"transparent" }}>{t}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="font-body text-xs font-semibold mb-1.5 block" style={{ color: "var(--ink-soft)" }}>Текст</label>
+              <textarea placeholder="Начните писать..." rows={6}
+                className="w-full px-3 py-2.5 rounded-lg font-body text-sm outline-none herb-border resize-none"
+                style={{ background: "var(--sage)", color: "var(--ink)" }} />
+            </div>
+            <button onClick={() => setStep("done")} className="w-full olive-btn py-2.5 rounded-lg text-sm">Опубликовать</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════
+   ИНФОРМАЦИОННЫЕ СТРАНИЦЫ (подвал)
+════════════════════════════════════════ */
+
+const INFO_PAGES: Record<string, { title: string; icon: string; content: React.ReactNode }> = {
+  about: {
+    title: "О нас",
+    icon: "🌿",
+    content: (
+      <div className="space-y-5">
+        <p className="font-display text-lg italic" style={{ color: "var(--ink-soft)" }}>Писатель.Плюс — живое пространство для людей, которых объединяет слово.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[
+            { icon:"✍️", title:"Писатели", desc:"Место для новичков, делающих первые шаги, и опытных авторов с аудиторией. Публикуйте по главам, получайте обратную связь, зарабатывайте коммерческим статусом." },
+            { icon:"📖", title:"Читатели", desc:"Тысячи книг всех жанров. Следите за любимыми авторами, пополняйте библиотеку, пишите рецензии и участвуйте в обсуждениях." },
+            { icon:"🤝", title:"Соавторы", desc:"Находите партнёров для совместного творчества. Пишите книги вместе, распределяйте главы, обменивайтесь идеями в защищённой среде." },
+            { icon:"🏆", title:"Участники событий", desc:"Конкурсы, дуэли, марафоны, флэшмобы — соревновательная среда для тех, кто хочет расти и получать признание сообщества." },
+          ].map(c => (
+            <div key={c.title} className="card-herb p-4">
+              <div className="text-2xl mb-2">{c.icon}</div>
+              <div className="font-display text-base font-semibold mb-1" style={{ color: "var(--ink)" }}>{c.title}</div>
+              <p className="font-body text-sm" style={{ color: "var(--ink-soft)" }}>{c.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    ),
+  },
+  rules: {
+    title: "Правила сайта",
+    icon: "📋",
+    content: (
+      <div className="space-y-4 font-body text-sm" style={{ color: "var(--ink-soft)" }}>
+        {[
+          { h:"1. Нормы поведения", t:"Уважайте других участников. Запрещены оскорбления, буллинг, дискриминация по любому признаку. Конструктивная критика приветствуется — агрессия нет." },
+          { h:"2. Публикация контента", t:"Все произведения должны быть авторскими. Плагиат влечёт немедленную блокировку. Контент 18+ обязательно маркируется. Запрещены пропаганда насилия, экстремизма и незаконной деятельности." },
+          { h:"3. Модерация", t:"Команда модераторов рассматривает жалобы в течение 48 часов. Решения модераторов окончательны. Апелляции подаются через форму обратной связи." },
+          { h:"4. Санкции", t:"За первое нарушение — предупреждение. За повторное — временная блокировка (от 3 до 30 дней). За грубые нарушения — перманентный бан без предупреждения." },
+          { h:"5. Авторские права", t:"Публикуя произведение, вы сохраняете все авторские права. Платформа не претендует на исключительные права и не использует контент в коммерческих целях без разрешения." },
+        ].map(r => (
+          <div key={r.h} className="card-herb p-4">
+            <div className="font-display text-base font-semibold mb-1" style={{ color: "var(--ink)" }}>{r.h}</div>
+            <p>{r.t}</p>
+          </div>
+        ))}
+      </div>
+    ),
+  },
+  help: {
+    title: "Справочная информация",
+    icon: "❓",
+    content: (
+      <div className="space-y-3">
+        {[
+          { q:"Как опубликовать книгу?", a:'Нажмите кнопку «Публикация» или «Создать» → «Написать книгу». Заполните форму: название, жанр, аннотацию, настройки доступа. После создания добавляйте главы поочерёдно.' },
+          { q:"Что такое коммерческий статус?", a:"Коммерческий статус позволяет монетизировать произведение. Требования: 200 000+ знаков, 150+ читателей, 50+ подписчиков. Статус рассматривается администрацией вручную." },
+          { q:"Как работают дуэли?", a:"Автор бросает вызов другому автору. Оба пишут рассказ на заданную тему за 24 часа. Читатели голосуют свитками-лайками. Победитель получает значок «Дуэлянт»." },
+          { q:"Как защитить текст от копирования?", a:'При создании книги включите переключатель «Защита от копирования». Это запрещает выделение и скачивание текста. Опция включена по умолчанию.' },
+          { q:"Что делать при нарушении авторских прав?", a:"Подайте жалобу через кнопку «Пожаловаться» на странице произведения. Приложите доказательства авторства. Модераторы рассмотрят в течение 48 часов." },
+        ].map((item, i) => (
+          <div key={i} className="card-herb p-4">
+            <div className="font-display text-base font-semibold mb-1" style={{ color: "var(--leaf)" }}>— {item.q}</div>
+            <p className="font-body text-sm" style={{ color: "var(--ink-soft)" }}>{item.a}</p>
+          </div>
+        ))}
+      </div>
+    ),
+  },
+  privacy: {
+    title: "Политика конфиденциальности",
+    icon: "🔒",
+    content: (
+      <div className="space-y-4 font-body text-sm" style={{ color: "var(--ink-soft)" }}>
+        {[
+          { h:"Сбор данных", t:"Мы собираем: имя и контактные данные при регистрации, технические данные браузера и устройства, данные об активности (прочитанные книги, лайки, комментарии). Данные не передаются третьим лицам." },
+          { h:"Хранение", t:"Данные хранятся на серверах в России согласно 152-ФЗ. Пароли хранятся в зашифрованном виде. Данные хранятся 3 года после удаления аккаунта, затем полностью удаляются." },
+          { h:"Использование", t:"Данные используются для: персонализации рекомендаций, улучшения работы платформы, отправки уведомлений (с вашего согласия), защиты от мошенничества." },
+          { h:"Ваши права", t:"Вы вправе запросить, изменить или удалить свои данные в любое время через настройки аккаунта или обратившись в поддержку. Запрос обрабатывается в течение 30 дней." },
+        ].map(r => (
+          <div key={r.h} className="card-herb p-4">
+            <div className="font-display text-base font-semibold mb-1" style={{ color: "var(--ink)" }}>{r.h}</div>
+            <p>{r.t}</p>
+          </div>
+        ))}
+      </div>
+    ),
+  },
+  terms: {
+    title: "Пользовательское соглашение",
+    icon: "📄",
+    content: (
+      <div className="space-y-4 font-body text-sm" style={{ color: "var(--ink-soft)" }}>
+        {[
+          { h:"1. Условия использования", t:"Пользуясь платформой, вы соглашаетесь с данным соглашением. Минимальный возраст — 14 лет (с разрешения родителей), 18 лет для контента 18+. Платформа оставляет право изменять условия с уведомлением за 30 дней." },
+          { h:"2. Права и обязанности пользователя", t:"Вы обязуетесь: соблюдать правила платформы, не нарушать авторские права, не использовать автоматизированные инструменты. Вы вправе: публиковать произведения, получать вознаграждение (при коммерческом статусе), удалить аккаунт." },
+          { h:"3. Авторские права", t:"Автор сохраняет все исключительные права на произведение. Публикуя работу, автор предоставляет платформе неисключительную лицензию на размещение и отображение контента пользователям." },
+          { h:"4. Ограничение ответственности", t:"Платформа не несёт ответственности за контент, созданный пользователями, за убытки от действий других пользователей, за временную недоступность сервиса." },
+          { h:"5. Применимое право", t:"Данное соглашение регулируется законодательством Российской Федерации. Споры разрешаются в судебном порядке по месту нахождения платформы." },
+        ].map(r => (
+          <div key={r.h} className="card-herb p-4">
+            <div className="font-display text-base font-semibold mb-1" style={{ color: "var(--ink)" }}>{r.h}</div>
+            <p>{r.t}</p>
+          </div>
+        ))}
+      </div>
+    ),
+  },
+};
+
+function InfoPageModal({ pageId, onClose }: { pageId: string; onClose: () => void }) {
+  const page = INFO_PAGES[pageId];
+  if (!page) return null;
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/25 p-4 overflow-y-auto" onClick={onClose}>
+      <div className="w-full max-w-2xl rounded-2xl shadow-2xl herb-border overflow-hidden anim-up my-4"
+        style={{ background: "var(--cream)" }} onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b"
+          style={{ borderColor: "var(--moss)", background: "linear-gradient(to right, var(--sage), var(--sage-mid))" }}>
+          <div className="flex items-center gap-2">
+            <span className="text-xl">{page.icon}</span>
+            <h2 className="font-display text-xl font-semibold" style={{ color: "var(--forest)" }}>{page.title}</h2>
+          </div>
+          <button onClick={onClose}><Icon name="X" size={18} style={{ color: "var(--ink-muted)" }} /></button>
+        </div>
+        <div className="p-6 max-h-[70vh] overflow-y-auto">{page.content}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════
+   ЛИЧНЫЙ КАБИНЕТ
+════════════════════════════════════════ */
+
+function DashboardSection({ userName, onNav }: { userName: string; onNav: (s: string) => void }) {
+  return (
+    <section className="mb-12">
+      <div className="rounded-2xl herb-border overflow-hidden mb-6"
+        style={{ background: "linear-gradient(135deg, var(--sage), var(--sage-mid) 60%, var(--sage-deep))" }}>
+        <div className="p-8 flex items-start gap-5">
+          <Avatar className="w-16 h-16 flex-shrink-0">
+            <AvatarFallback className="font-display text-2xl font-semibold"
+              style={{ background: "var(--olive)", color: "var(--cream)" }}>
+              {userName.slice(0,2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1">
+            <h2 className="font-display text-3xl font-semibold mb-1" style={{ color: "var(--forest)" }}>{userName}</h2>
+            <span className="genre-badge">Автор</span>
+            <div className="mt-3 grid grid-cols-3 gap-3">
+              {[["0","книг"],["0","читателей"],["0","подписчиков"]].map(([v,l]) => (
+                <div key={l} className="text-center p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.5)" }}>
+                  <div className="font-display text-xl font-semibold" style={{ color: "var(--leaf)" }}>{v}</div>
+                  <div className="font-body text-xs" style={{ color: "var(--ink-muted)" }}>{l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        {/* Прогресс коммерческого статуса */}
+        <div className="px-8 pb-5">
+          <div className="p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.4)", border: "1px dashed var(--olive-light)" }}>
+            <div className="flex justify-between items-center mb-1">
+              <span className="font-body text-xs font-semibold" style={{ color: "var(--forest)" }}>Коммерческий статус — в разработке</span>
+              <span className="font-body text-xs" style={{ color: "var(--ink-muted)" }}>0%</span>
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden mb-1" style={{ background: "var(--sage-deep)" }}>
+              <div className="h-full rounded-full" style={{ width: "0%", background: "var(--leaf)" }} />
+            </div>
+            <div className="font-body text-xs" style={{ color: "var(--ink-muted)" }}>
+              Нужно: 200 000 знаков · 150 читателей · 50 подписчиков
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Быстрые действия */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        {[
+          { icon:"📜", label:"Новая книга", action:() => {} },
+          { icon:"✏️", label:"Написать блог", action:() => {} },
+          { icon:"📚", label:"Моя библиотека", action:() => onNav("library") },
+          { icon:"🔥", label:"Каминная", action:() => onNav("fireplace") },
+        ].map(a => (
+          <button key={a.label} onClick={a.action} className="card-herb p-4 text-center cursor-pointer">
+            <div className="text-3xl mb-1.5">{a.icon}</div>
+            <div className="font-body text-sm font-medium" style={{ color: "var(--ink-soft)" }}>{a.label}</div>
+          </button>
+        ))}
+      </div>
+
+      {/* Мои рукописи */}
+      <div className="card-herb p-5 mb-4">
+        <h3 className="font-display text-xl font-semibold mb-4" style={{ color: "var(--ink)" }}>Мои рукописи</h3>
+        <div className="text-center py-8">
+          <div className="text-4xl mb-3">📝</div>
+          <p className="font-display text-lg" style={{ color: "var(--ink-muted)" }}>Здесь будут ваши книги</p>
+          <p className="font-body text-sm mt-1 mb-4" style={{ color: "var(--ink-muted)" }}>Нажмите «Новая книга», чтобы начать</p>
+          <button className="olive-btn px-5 py-2 rounded-lg text-sm">Создать первую книгу</button>
+        </div>
+      </div>
+
+      {/* Активность */}
+      <div className="card-herb p-5">
+        <h3 className="font-display text-xl font-semibold mb-3" style={{ color: "var(--ink)" }}>Последняя активность</h3>
+        <div className="text-center py-6">
+          <p className="font-body text-sm" style={{ color: "var(--ink-muted)" }}>Активность появится после первых публикаций и взаимодействий</p>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -876,6 +1604,75 @@ const NAV = [
 ];
 
 /* ════════════════════════════════════════
+   ПОДВАЛ
+════════════════════════════════════════ */
+
+function Footer({ onInfoPage }: { onInfoPage: (id: string) => void }) {
+  return (
+    <footer className="border-t mt-12" style={{ borderColor: "var(--moss)", background: "var(--sage-mid)" }}>
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span>🌿</span>
+              <span className="font-display text-base font-semibold" style={{ color: "var(--forest)" }}>Писатель.Плюс</span>
+            </div>
+            <p className="font-body text-xs" style={{ color: "var(--ink-muted)" }}>
+              Литературное сообщество для авторов и читателей
+            </p>
+          </div>
+          <div>
+            <div className="font-body text-xs font-semibold mb-3 uppercase tracking-wider" style={{ color: "var(--ink-muted)" }}>Платформа</div>
+            <div className="space-y-1.5">
+              {[["about","О нас"],["rules","Правила сайта"],["help","Справка"]].map(([id,l]) => (
+                <button key={id} onClick={() => onInfoPage(id)}
+                  className="block font-body text-sm text-left transition-all"
+                  style={{ color: "var(--ink-soft)", background: "transparent" }}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="font-body text-xs font-semibold mb-3 uppercase tracking-wider" style={{ color: "var(--ink-muted)" }}>Правовые</div>
+            <div className="space-y-1.5">
+              {[["privacy","Конфиденциальность"],["terms","Пользовательское соглашение"]].map(([id,l]) => (
+                <button key={id} onClick={() => onInfoPage(id)}
+                  className="block font-body text-sm text-left transition-all"
+                  style={{ color: "var(--ink-soft)", background: "transparent" }}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="font-body text-xs font-semibold mb-3 uppercase tracking-wider" style={{ color: "var(--ink-muted)" }}>Связь</div>
+            <div className="space-y-1.5">
+              {["Поддержка","Обратная связь","Для СМИ"].map(l => (
+                <button key={l} className="block font-body text-sm text-left"
+                  style={{ color: "var(--ink-soft)", background: "transparent" }}>{l}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="pt-4 border-t flex flex-col md:flex-row items-center justify-between gap-2"
+          style={{ borderColor: "var(--moss)" }}>
+          <p className="font-body text-xs" style={{ color: "var(--ink-muted)" }}>
+            © 2026 Писатель.Плюс. Все права защищены.
+          </p>
+          <div className="flex gap-3">
+            {[["privacy","Конфиденциальность"],["terms","Соглашение"]].map(([id,l]) => (
+              <button key={id} onClick={() => onInfoPage(id)}
+                className="font-body text-xs" style={{ color: "var(--ink-muted)", background: "transparent" }}>{l}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+/* ════════════════════════════════════════
    ГЛАВНЫЙ КОМПОНЕНТ
 ════════════════════════════════════════ */
 export default function Index() {
@@ -885,14 +1682,39 @@ export default function Index() {
   const [showProfile, setShowProfile] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
 
+  // Авторизация
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userName, setUserName] = useState("");
+  const [showAuth, setShowAuth] = useState(false);
+
+  // Создание
+  const [showCreate, setShowCreate] = useState(false);
+
+  // Инфостраницы
+  const [infoPage, setInfoPage] = useState<string | null>(null);
+
   const goTo = (id: string) => {
     setSection(id);
     setMobileNav(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const handleLogin = (name: string) => {
+    setIsLoggedIn(true);
+    setUserName(name);
+    setSection("dashboard");
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setUserName("");
+    setSection("home");
+    setShowProfile(false);
+  };
+
   const renderSection = () => {
     switch (section) {
+      case "dashboard": return <DashboardSection userName={userName} onNav={goTo} />;
       case "manuscripts": return <ManuscriptsSection />;
       case "reader": return <ReaderSection />;
       case "library": return <LibrarySection />;
@@ -916,8 +1738,10 @@ export default function Index() {
     }
   };
 
+  const userInitials = userName ? userName.slice(0,2).toUpperCase() : "?";
+
   return (
-    <div className="min-h-screen" style={{ color: "var(--ink)" }}>
+    <div className="min-h-screen flex flex-col" style={{ color: "var(--ink)" }}>
       {/* ─── Шапка ─── */}
       <header className="sticky top-0 z-40 border-b"
         style={{ background: "rgba(234,242,228,0.93)", backdropFilter: "blur(14px)", borderColor: "var(--moss)" }}>
@@ -943,23 +1767,37 @@ export default function Index() {
 
           {/* Правые */}
           <div className="flex items-center gap-1 flex-shrink-0">
-            <button onClick={() => { setShowMsg(true); setShowNotif(false); setShowProfile(false); }}
-              className="relative p-2 rounded-lg" style={{ color: "var(--ink-soft)" }}>
-              <Icon name="MessageCircle" size={20} />
-              <div className="notif-badge" />
-            </button>
-            <button onClick={() => { setShowNotif(!showNotif); setShowMsg(false); setShowProfile(false); }}
-              className="relative p-2 rounded-lg" style={{ color: "var(--ink-soft)" }}>
-              <Icon name="Bell" size={20} />
-              <div className="notif-badge" />
-            </button>
-            <button className="olive-btn text-sm px-3 py-1.5 rounded-lg hidden md:block ml-1">Написать</button>
-            <button onClick={() => { setShowProfile(!showProfile); setShowNotif(false); setShowMsg(false); }} className="ml-1">
-              <Avatar className="w-8 h-8">
-                <AvatarFallback className="font-body text-xs font-semibold"
-                  style={{ background: "var(--olive)", color: "var(--cream)" }}>СВ</AvatarFallback>
-              </Avatar>
-            </button>
+            {isLoggedIn ? (
+              <>
+                {/* Кнопка Создать */}
+                <button onClick={() => setShowCreate(true)}
+                  className="olive-btn text-sm px-3 py-1.5 rounded-lg hidden md:flex items-center gap-1.5 mr-1">
+                  <Icon name="Plus" size={14} />
+                  Создать
+                </button>
+                <button onClick={() => { setShowMsg(true); setShowNotif(false); setShowProfile(false); }}
+                  className="relative p-2 rounded-lg" style={{ color: "var(--ink-soft)" }}>
+                  <Icon name="MessageCircle" size={20} />
+                  <div className="notif-badge" />
+                </button>
+                <button onClick={() => { setShowNotif(!showNotif); setShowMsg(false); setShowProfile(false); }}
+                  className="relative p-2 rounded-lg" style={{ color: "var(--ink-soft)" }}>
+                  <Icon name="Bell" size={20} />
+                  <div className="notif-badge" />
+                </button>
+                <button onClick={() => { setShowProfile(!showProfile); setShowNotif(false); setShowMsg(false); }} className="ml-1">
+                  <Avatar className="w-8 h-8">
+                    <AvatarFallback className="font-body text-xs font-semibold"
+                      style={{ background: "var(--olive)", color: "var(--cream)" }}>{userInitials}</AvatarFallback>
+                  </Avatar>
+                </button>
+              </>
+            ) : (
+              <button onClick={() => setShowAuth(true)}
+                className="olive-btn text-sm px-4 py-1.5 rounded-lg">
+                Войти
+              </button>
+            )}
             <button onClick={() => setMobileNav(!mobileNav)} className="xl:hidden p-2 ml-1" style={{ color: "var(--ink-soft)" }}>
               <Icon name={mobileNav ? "X" : "Menu"} size={20} />
             </button>
@@ -977,28 +1815,52 @@ export default function Index() {
                 {n.label}
               </button>
             ))}
+            {isLoggedIn && (
+              <button onClick={() => { setShowCreate(true); setMobileNav(false); }}
+                className="nav-herb text-xs" style={{ background: "var(--olive)", color: "var(--cream)" }}>
+                <Icon name="Plus" size={11} />
+                Создать
+              </button>
+            )}
           </div>
         )}
       </header>
 
       {/* ─── Контент ─── */}
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="flex-1 max-w-4xl mx-auto px-4 py-8 w-full">
         <div key={section} className="anim-up">
           {renderSection()}
         </div>
       </main>
 
-      {/* ─── FAB ─── */}
-      <div className="fixed bottom-6 right-6 z-40">
-        <button className="olive-btn flex items-center gap-2 px-5 py-3 rounded-full shadow-lg text-sm">
-          <Icon name="PenLine" size={16} />
-          Публикация
-        </button>
-      </div>
+      {/* ─── Подвал ─── */}
+      <Footer onInfoPage={(id) => setInfoPage(id)} />
 
+      {/* ─── FAB (только для авторизованных) ─── */}
+      {isLoggedIn && (
+        <div className="fixed bottom-6 right-6 z-40">
+          <button onClick={() => setShowCreate(true)}
+            className="olive-btn flex items-center gap-2 px-5 py-3 rounded-full shadow-lg text-sm">
+            <Icon name="Plus" size={16} />
+            Создать
+          </button>
+        </div>
+      )}
+
+      {/* ─── Модалы ─── */}
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} onLogin={handleLogin} />}
+      {showCreate && <CreateModal onClose={() => setShowCreate(false)} />}
+      {infoPage && <InfoPageModal pageId={infoPage} onClose={() => setInfoPage(null)} />}
       {showNotif && <NotifPanel onClose={() => setShowNotif(false)} />}
       {showMsg && <MessengerPanel onClose={() => setShowMsg(false)} />}
-      {showProfile && <ProfilePanel onClose={() => setShowProfile(false)} />}
+      {showProfile && (
+        <ProfilePanel
+          onClose={() => setShowProfile(false)}
+          userName={userName}
+          onLogout={handleLogout}
+          onDashboard={() => { goTo("dashboard"); setShowProfile(false); }}
+        />
+      )}
     </div>
   );
 }
